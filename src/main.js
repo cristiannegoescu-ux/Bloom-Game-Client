@@ -1,4 +1,4 @@
-const { app, BrowserWindow, nativeImage } = require('electron');
+const { app, BrowserWindow, nativeImage, globalShortcut } = require('electron');
 const path = require('path');
 
 let gameWindow = null;
@@ -17,6 +17,25 @@ function createGameWindow() {
 
   gameWindow.loadFile(path.join(__dirname, 'game.html'));
   gameWindow.setMenuBarVisibility(false);
+
+  // Allow escaping fullscreen
+  gameWindow.on('focus', () => {
+    globalShortcut.register('F11', () => {
+      if (gameWindow && !gameWindow.isDestroyed()) {
+        gameWindow.setFullScreen(!gameWindow.isFullScreen());
+      }
+    });
+    globalShortcut.register('Escape', () => {
+      if (gameWindow && !gameWindow.isDestroyed() && gameWindow.isFullScreen()) {
+        gameWindow.setFullScreen(false);
+      }
+    });
+  });
+
+  gameWindow.on('blur', () => {
+    globalShortcut.unregister('F11');
+    globalShortcut.unregister('Escape');
+  });
 }
 
 app.whenReady().then(() => {
@@ -25,3 +44,4 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => app.quit());
+app.on('will-quit', () => globalShortcut.unregisterAll());
