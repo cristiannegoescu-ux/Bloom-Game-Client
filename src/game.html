@@ -557,6 +557,7 @@ function simulateCrash() {
 
 function simulateDefect() {
   if (activeDefect) return;
+  if (!snake) { startGame(); }
   clearInterval(gameInterval);
   gameInterval = null;
   triggerDefect(snake ? snake[0] : { x: 10, y: 10 });
@@ -640,9 +641,9 @@ function draw() {
 
 // ── Input ─────────────────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  // Global shortcuts — work any time game is running
-  if (e.key === 'S' && snake && !activeDefect) { simulateCrash();  e.preventDefault(); return; }
-  if (e.key === 'F' && snake && !activeDefect) { simulateDefect(); e.preventDefault(); return; }
+  // Global shortcuts — work any time (case-insensitive)
+  if ((e.key === 's' || e.key === 'S') && !activeDefect) { simulateCrash();  e.preventDefault(); return; }
+  if ((e.key === 'f' || e.key === 'F') && !activeDefect) { simulateDefect(); e.preventDefault(); return; }
 
   if (activeDefect) {
     if (e.key === 'Escape') dismissDefect();
