@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Bloom Snake</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #070a12;
+    color: #e6edf3;
+    font-family: 'Inter', sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    height: 100vh; overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── Header ── */
+  .header {
+    width: 100%; padding: 10px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(13,16,23,0.95);
+    flex-shrink: 0;
+  }
+  .header-brand { display: flex; align-items: center; gap: 10px; }
+  .header-logo {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: linear-gradient(145deg,#0f1a2e,#1c2a48);
+    border: 1.5px solid rgba(79,142,247,0.5);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 900; color: #4f8ef7;
+  }
+  .header-title { font-size: 13px; font-weight: 800; color: #fff; }
+  .header-sub   { font-size: 10px; color: rgba(79,142,247,0.8); font-weight: 600; letter-spacing: 0.08em; }
+  .score-area   { display: flex; gap: 20px; }
+  .score-box    { text-align: center; }
+  .score-label  { font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: #484f58; font-weight: 700; }
+  .score-val    { font-size: 18px; font-weight: 900; color: #4f8ef7; }
+
+  /* ── Game area ── */
+  .game-area {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+
+  canvas {
+    border: 1px solid rgba(79,142,247,0.2);
+    box-shadow: 0 0 40px rgba(79,142,247,0.08), inset 0 0 60px rgba(0,0,0,0.4);
+    border-radius: 4px;
+    display: block;
+  }
+
+  /* ── Overlays ── */
+  .overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px;
+    background: rgba(7,10,18,0.92);
+    border-radius: 4px;
+  }
+  .overlay.hidden { display: none; }
+
+  .overlay-title {
+    font-size: 26px; font-weight: 900; letter-spacing: 0.04em; text-align: center;
+  }
+  .overlay-sub {
+    font-size: 13px; color: #484f58; text-align: center; max-width: 340px; line-height: 1.6;
+  }
+  .overlay-btn {
+    padding: 11px 32px; border-radius: 8px; font-size: 13px; font-weight: 800;
+    font-family: inherit; cursor: pointer; letter-spacing: 0.04em; border: none;
+    background: linear-gradient(135deg, #4f8ef7, #7b6cf7); color: #fff;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .overlay-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+  .overlay-btn.secondary {
+    background: transparent; border: 1px solid rgba(255,255,255,0.15); color: #8b949e;
+  }
+
+  /* ── Defect report overlay ── */
+  #defect-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(7,10,18,0.96);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    gap: 0;
+    animation: fade-in 0.3s ease;
+  }
+  #defect-overlay.visible { display: flex; }
+
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+  .defect-card {
+    background: #0d1017; border: 1px solid rgba(248,81,73,0.4); border-radius: 12px;
+    padding: 28px 32px; width: 520px; max-width: 90vw;
+    box-shadow: 0 0 60px rgba(248,81,73,0.15);
+  }
+  .defect-header {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+  }
+  .defect-icon {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(248,81,73,0.12); border: 1px solid rgba(248,81,73,0.3);
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    flex-shrink: 0;
+    animation: pulse-red 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse-red {
+    0%,100% { box-shadow: 0 0 8px rgba(248,81,73,0.4); }
+    50%      { box-shadow: 0 0 20px rgba(248,81,73,0.8); }
+  }
+  .defect-title { font-size: 16px; font-weight: 900; color: #f85149; }
+  .defect-id    { font-size: 10px; color: #484f58; font-weight: 600; letter-spacing: 0.1em; margin-top: 2px; }
+
+  .defect-fields { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .defect-field { display: flex; gap: 10px; font-size: 12px; }
+  .df-label { color: #484f58; font-weight: 700; width: 110px; flex-shrink: 0; }
+  .df-value { color: #cdd9e5; }
+
+  .defect-stack {
+    background: #070a12; border: 1px solid rgba(255,255,255,0.06); border-radius: 6px;
+    padding: 10px 12px; font-family: 'Courier New', monospace;
+    font-size: 10px; color: #f85149; line-height: 1.7; margin-bottom: 20px;
+  }
+
+  .defect-actions { display: flex; gap: 10px; }
+  .defect-actions button {
+    flex: 1; padding: 10px; border-radius: 7px; font-size: 12px; font-weight: 700;
+    font-family: inherit; cursor: pointer; border: none; transition: opacity 0.15s;
+  }
+  .btn-view    { background: linear-gradient(135deg,#4f8ef7,#7b6cf7); color: #fff; }
+  .btn-dismiss { background: transparent; border: 1px solid rgba(255,255,255,0.12) !important; color: #8b949e; }
+  .defect-actions button:hover { opacity: 0.85; }
+
+  .bloom-badge {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 14px;
+    font-size: 10px; color: #4f8ef7; font-weight: 700; letter-spacing: 0.06em;
+  }
+  .bloom-dot { width: 6px; height: 6px; border-radius: 50%; background: #4f8ef7;
+    box-shadow: 0 0 6px #4f8ef7; animation: blink-dot 1.2s ease-in-out infinite; }
+  @keyframes blink-dot { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-brand">
+    <div class="header-logo">B</div>
+    <div>
+      <div class="header-title">Bloom Snake</div>
+      <div class="header-sub">Bloomberg QC Demo · Defect Detection Active</div>
+    </div>
+  </div>
+  <div class="score-area">
+    <div class="score-box">
+      <div class="score-label">Score</div>
+      <div class="score-val" id="score">0</div>
+    </div>
+    <div class="score-box">
+      <div class="score-label">Level</div>
+      <div class="score-val" id="level">1</div>
+    </div>
+    <div class="score-box">
+      <div class="score-label">Defects</div>
+      <div class="score-val" id="defect-count" style="color:#f85149;">0</div>
+    </div>
+  </div>
+</div>
+
+<!-- Game canvas -->
+<div class="game-area">
+  <canvas id="canvas" width="560" height="560"></canvas>
+
+  <!-- Start overlay -->
+  <div class="overlay" id="start-overlay">
+    <div class="overlay-title">Bloom Snake</div>
+    <div class="overlay-sub">Use arrow keys or WASD to move. Eat the blue food to score. Watch out for <span style="color:#f85149;">🐛 bug food</span> — Bloom AI will detect any defects!</div>
+    <button class="overlay-btn" onclick="startGame()">Start Game</button>
+  </div>
+
+  <!-- Game over overlay -->
+  <div class="overlay hidden" id="gameover-overlay">
+    <div class="overlay-title" style="color:#f85149;">Game Over</div>
+    <div class="overlay-sub" id="gameover-msg">Your score: 0</div>
+    <button class="overlay-btn" onclick="startGame()">Play Again</button>
+  </div>
+</div>
+
+<!-- Defect report overlay -->
+<div id="defect-overlay">
+  <div class="defect-card">
+    <div class="bloom-badge"><div class="bloom-dot"></div> BLOOM AI DETECTED</div>
+    <div class="defect-header">
+      <div class="defect-icon">🐛</div>
+      <div>
+        <div class="defect-title" id="d-title">Critical Defect Detected</div>
+        <div class="defect-id" id="d-id">DEF-0001 · AUTO-GENERATED</div>
+      </div>
+    </div>
+    <div class="defect-fields">
+      <div class="defect-field"><span class="df-label">Type</span><span class="df-value" id="d-type">—</span></div>
+      <div class="defect-field"><span class="df-label">Severity</span><span class="df-value" id="d-severity">—</span></div>
+      <div class="defect-field"><span class="df-label">Component</span><span class="df-value" id="d-component">—</span></div>
+      <div class="defect-field"><span class="df-label">Session</span><span class="df-value" id="d-session">—</span></div>
+      <div class="defect-field"><span class="df-label">Score at crash</span><span class="df-value" id="d-score">—</span></div>
+      <div class="defect-field"><span class="df-label">Position</span><span class="df-value" id="d-pos">—</span></div>
+    </div>
+    <div class="defect-stack" id="d-stack"></div>
+    <div class="defect-actions">
+      <button class="btn-view" onclick="openInBloom()">View in Bloomberg Reporter</button>
+      <button class="btn-dismiss" onclick="dismissDefect()">Dismiss</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const http = require('http');
+
+// ── Game constants ────────────────────────────────────────────────────────────
+const GRID = 20;
+const CELL = 28;
+const CANVAS_SIZE = 560;
+
+const COLORS = {
+  bg:         '#070a12',
+  grid:       'rgba(79,142,247,0.04)',
+  snake:      '#4f8ef7',
+  snakeHead:  '#7b6cf7',
+  food:       '#3fb950',
+  bugFood:    '#f85149',
+  bugGlow:    'rgba(248,81,73,0.3)',
+};
+
+// ── Defect templates ──────────────────────────────────────────────────────────
+const DEFECT_TEMPLATES = [
+  {
+    type: 'NullReferenceException',
+    severity: 'Critical',
+    component: 'SnakeMovementController',
+    summary: 'NullReferenceException in movement controller',
+    stack: [
+      'NullReferenceException: Object reference not set',
+      '  at SnakeMovementController.Update() :28',
+      '  at GameLoop.Tick() :114',
+      '  at Application.Run() :7',
+    ]
+  },
+  {
+    type: 'Collision Detection Failure',
+    severity: 'High',
+    component: 'CollisionManager',
+    summary: 'Snake passed through wall boundary — collision missed',
+    stack: [
+      'AssertionError: expected collision at boundary',
+      '  at CollisionManager.checkBounds() :55',
+      '  at PhysicsEngine.step() :203',
+      '  at GameLoop.Tick() :114',
+    ]
+  },
+  {
+    type: 'Memory Leak',
+    severity: 'High',
+    component: 'FoodSpawnSystem',
+    summary: 'Food entity not deallocated after consumption',
+    stack: [
+      'HeapAllocationWarning: GC pressure detected',
+      '  at FoodSpawnSystem.spawn() :19',
+      '  at EntityPool.recycle() :88',
+      '  at GameLoop.Tick() :114',
+    ]
+  },
+  {
+    type: 'State Corruption',
+    severity: 'Critical',
+    component: 'GameStateManager',
+    summary: 'Invalid game state transition detected',
+    stack: [
+      'StateError: transition PLAYING -> PLAYING not allowed',
+      '  at GameStateManager.setState() :41',
+      '  at InputHandler.handleKey() :72',
+      '  at EventQueue.flush() :30',
+    ]
+  },
+];
+
+// ── Game state ────────────────────────────────────────────────────────────────
+let snake, dir, nextDir, food, bugFood, score, level, defectCount;
+let gameInterval = null;
+let sessionId = Math.random().toString(36).slice(2,8).toUpperCase();
+let defectSeq = 0;
+let activeDefect = null;
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+function rndCell() {
+  return {
+    x: Math.floor(Math.random() * GRID),
+    y: Math.floor(Math.random() * GRID)
+  };
+}
+
+function spawnFood() {
+  let pos;
+  do { pos = rndCell(); }
+  while (snake.some(s => s.x === pos.x && s.y === pos.y));
+  return pos;
+}
+
+function spawnBugFood() {
+  if (Math.random() > 0.35) return null; // 35% chance a bug appears
+  let pos;
+  do { pos = rndCell(); }
+  while (snake.some(s => s.x === pos.x && s.y === pos.y));
+  return pos;
+}
+
+function startGame() {
+  document.getElementById('start-overlay').classList.add('hidden');
+  document.getElementById('gameover-overlay').classList.add('hidden');
+  dismissDefect();
+
+  snake    = [{x:10, y:10}, {x:9, y:10}, {x:8, y:10}];
+  dir      = {x:1, y:0};
+  nextDir  = {x:1, y:0};
+  food     = spawnFood();
+  bugFood  = spawnBugFood();
+  score    = 0; level = 1; defectCount = 0;
+  sessionId = Math.random().toString(36).slice(2,8).toUpperCase();
+  defectSeq = 0;
+
+  updateUI();
+
+  if (gameInterval) clearInterval(gameInterval);
+  gameInterval = setInterval(gameStep, 120);
+}
+
+function gameStep() {
+  if (activeDefect) return; // pause game while defect overlay is shown
+
+  dir = { ...nextDir };
+  const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+  // Wall collision → game over
+  if (head.x < 0 || head.x >= GRID || head.y < 0 || head.y >= GRID) {
+    return gameOver('Wall collision detected');
+  }
+  // Self collision → game over
+  if (snake.some(s => s.x === head.x && s.y === head.y)) {
+    return gameOver('Self-intersection detected');
+  }
+
+  snake.unshift(head);
+
+  // Ate normal food
+  if (head.x === food.x && head.y === food.y) {
+    score += 10 * level;
+    food = spawnFood();
+    if (score % 50 === 0) level++;
+    if (Math.random() < 0.4) bugFood = spawnBugFood();
+    updateUI();
+  } else {
+    snake.pop();
+  }
+
+  // Ate bug food → defect triggered
+  if (bugFood && head.x === bugFood.x && head.y === bugFood.y) {
+    bugFood = null;
+    triggerDefect(head);
+    return;
+  }
+
+  draw();
+}
+
+function triggerDefect(pos) {
+  clearInterval(gameInterval);
+  gameInterval = null;
+
+  const tmpl = DEFECT_TEMPLATES[Math.floor(Math.random() * DEFECT_TEMPLATES.length)];
+  defectSeq++;
+  defectCount++;
+  updateUI();
+
+  const defect = {
+    id:        `DEF-${String(defectSeq).padStart(4,'0')}`,
+    type:      tmpl.type,
+    severity:  tmpl.severity,
+    component: tmpl.component,
+    summary:   tmpl.summary,
+    session:   sessionId,
+    score:     score,
+    position:  `grid(${pos.x}, ${pos.y})`,
+    stack:     tmpl.stack,
+    timestamp: new Date().toISOString(),
+  };
+
+  activeDefect = defect;
+
+  // Populate overlay
+  document.getElementById('d-title').textContent   = tmpl.summary;
+  document.getElementById('d-id').textContent       = `${defect.id} · AUTO-GENERATED · DEMO MODE`;
+  document.getElementById('d-type').textContent     = tmpl.type;
+  document.getElementById('d-severity').innerHTML   = `<span style="color:${tmpl.severity==='Critical'?'#f85149':'#d29922'}">${tmpl.severity}</span>`;
+  document.getElementById('d-component').textContent= tmpl.component;
+  document.getElementById('d-session').textContent  = `Session ${sessionId}`;
+  document.getElementById('d-score').textContent    = `${score} pts`;
+  document.getElementById('d-pos').textContent      = defect.position;
+  document.getElementById('d-stack').textContent    = tmpl.stack.join('\n');
+  document.getElementById('defect-overlay').classList.add('visible');
+
+  // Notify Bloom Assistant
+  sendToBloom(defect);
+}
+
+function sendToBloom(defect) {
+  const payload = JSON.stringify({
+    type:    defect.type,
+    summary: defect.summary,
+    id:      defect.id,
+    severity: defect.severity,
+    session: defect.session,
+    score:   defect.score,
+  });
+
+  const options = {
+    hostname: '127.0.0.1',
+    port:     3333,
+    path:     '/defect',
+    method:   'POST',
+    headers:  {
+      'Content-Type':   'application/json',
+      'Content-Length': Buffer.byteLength(payload),
+    }
+  };
+
+  const req = http.request(options, () => {});
+  req.on('error', () => {}); // silently ignore if Bloom isn't running
+  req.write(payload);
+  req.end();
+}
+
+function openInBloom() {
+  const { shell } = require('electron');
+  shell.openExternal('http://10.18.68.179/platform/#reporter');
+  dismissDefect();
+}
+
+function dismissDefect() {
+  activeDefect = null;
+  document.getElementById('defect-overlay').classList.remove('visible');
+  // Resume game
+  if (!gameInterval && snake) {
+    bugFood = spawnBugFood();
+    gameInterval = setInterval(gameStep, 120);
+  }
+}
+
+function gameOver(reason) {
+  clearInterval(gameInterval);
+  gameInterval = null;
+  const msg = document.getElementById('gameover-msg');
+  msg.innerHTML = `Final score: <strong style="color:#4f8ef7">${score}</strong><br/>
+    <span style="font-size:11px;color:#484f58;margin-top:4px;display:block;">${reason}</span>`;
+  document.getElementById('gameover-overlay').classList.remove('hidden');
+}
+
+function updateUI() {
+  document.getElementById('score').textContent        = score;
+  document.getElementById('level').textContent        = level;
+  document.getElementById('defect-count').textContent = defectCount;
+}
+
+// ── Drawing ───────────────────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  // Background
+  ctx.fillStyle = COLORS.bg;
+  ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  // Grid lines
+  ctx.strokeStyle = COLORS.grid;
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= GRID; i++) {
+    ctx.beginPath(); ctx.moveTo(i * CELL, 0); ctx.lineTo(i * CELL, CANVAS_SIZE); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, i * CELL); ctx.lineTo(CANVAS_SIZE, i * CELL); ctx.stroke();
+  }
+
+  // Normal food
+  if (food) {
+    ctx.fillStyle = COLORS.food;
+    ctx.shadowColor = COLORS.food;
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(food.x * CELL + CELL/2, food.y * CELL + CELL/2, CELL/2 - 3, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // Bug food
+  if (bugFood) {
+    ctx.fillStyle = COLORS.bugFood;
+    ctx.shadowColor = COLORS.bugFood;
+    ctx.shadowBlur = 14;
+    ctx.beginPath();
+    ctx.arc(bugFood.x * CELL + CELL/2, bugFood.y * CELL + CELL/2, CELL/2 - 3, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // 🐛 label
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🐛', bugFood.x * CELL + CELL/2, bugFood.y * CELL + CELL/2);
+  }
+
+  // Snake
+  snake.forEach((seg, i) => {
+    const isHead = i === 0;
+    ctx.fillStyle = isHead ? COLORS.snakeHead : COLORS.snake;
+    if (isHead) {
+      ctx.shadowColor = COLORS.snakeHead;
+      ctx.shadowBlur = 12;
+    } else {
+      ctx.shadowBlur = 0;
+    }
+    const pad = isHead ? 1 : 2;
+    ctx.beginPath();
+    ctx.roundRect(seg.x * CELL + pad, seg.y * CELL + pad, CELL - pad*2, CELL - pad*2, isHead ? 5 : 3);
+    ctx.fill();
+  });
+  ctx.shadowBlur = 0;
+}
+
+// ── Input ─────────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (activeDefect) {
+    if (e.key === 'Escape') dismissDefect();
+    return;
+  }
+  const map = {
+    ArrowUp:    {x:0,y:-1}, w: {x:0,y:-1}, W: {x:0,y:-1},
+    ArrowDown:  {x:0,y:1},  s: {x:0,y:1},  S: {x:0,y:1},
+    ArrowLeft:  {x:-1,y:0}, a: {x:-1,y:0}, A: {x:-1,y:0},
+    ArrowRight: {x:1,y:0},  d: {x:1,y:0},  D: {x:1,y:0},
+  };
+  const nd = map[e.key];
+  if (nd) {
+    // Prevent 180-degree reversal
+    if (nd.x !== -dir.x || nd.y !== -dir.y) nextDir = nd;
+    e.preventDefault();
+  }
+});
+
+// Initial draw
+ctx.fillStyle = COLORS.bg;
+ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+</script>
+</body>
+</html>
