@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <title>Bloom Snake</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23000'/%3E%3C/svg%3E"/>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
 
@@ -177,7 +178,7 @@
   <!-- Start overlay -->
   <div class="overlay" id="start-overlay">
     <div class="overlay-title">Bloom Snake</div>
-    <div class="overlay-sub">Use arrow keys or WASD to move. Eat the blue food to score. Watch out for <span style="color:#f85149;">🐛 bug food</span> — Bloom AI will detect any defects!</div>
+    <div class="overlay-sub">Use arrow keys or WASD to move. Eat the blue food to score.<br/>Watch out for <span style="color:#f85149;">🐛 bug food</span> — Bloom AI will detect any defects!<br/><br/><span style="color:#f85149;font-weight:700;">S</span> = simulate crash &nbsp;·&nbsp; <span style="color:#f85149;font-weight:700;">F</span> = simulate defect found</div>
     <button class="overlay-btn" onclick="startGame()">Start Game</button>
   </div>
 
@@ -186,6 +187,17 @@
     <div class="overlay-title" style="color:#f85149;">Game Over</div>
     <div class="overlay-sub" id="gameover-msg">Your score: 0</div>
     <button class="overlay-btn" onclick="startGame()">Play Again</button>
+  </div>
+
+  <!-- Crash overlay -->
+  <div class="overlay hidden" id="crash-overlay" style="background:rgba(7,10,18,0.97);">
+    <div style="font-size:48px;margin-bottom:8px;">💥</div>
+    <div class="overlay-title" style="color:#f85149;font-size:22px;letter-spacing:0.06em;">CRITICAL CRASH</div>
+    <div class="overlay-sub" id="crash-msg" style="color:#f85149;opacity:0.7;font-family:monospace;font-size:11px;max-width:400px;"></div>
+    <div style="display:flex;gap:12px;margin-top:8px;">
+      <button class="overlay-btn" onclick="relaunchGame()" style="background:linear-gradient(135deg,#f85149,#d03030);">🔄 Relaunch</button>
+      <button class="overlay-btn secondary" onclick="openInBloomFromCrash()">View in Bloomberg Reporter</button>
+    </div>
   </div>
 </div>
 
@@ -335,7 +347,7 @@ function startGame() {
   updateUI();
 
   if (gameInterval) clearInterval(gameInterval);
-  gameInterval = setInterval(gameStep, 120);
+  gameInterval = setInterval(gameStep, 220);
 }
 
 function gameStep() {
@@ -424,6 +436,7 @@ function sendToBloom(defect) {
     severity: defect.severity,
     session: defect.session,
     score:   defect.score,
+    isCrash: !!defect.isCrash,
   });
 
   const options = {
@@ -449,14 +462,63 @@ function openInBloom() {
   dismissDefect();
 }
 
+function openInBloomFromCrash() {
+  const { shell } = require('electron');
+  shell.openExternal('http://10.18.68.179/platform/#reporter');
+}
+
 function dismissDefect() {
   activeDefect = null;
   document.getElementById('defect-overlay').classList.remove('visible');
-  // Resume game
   if (!gameInterval && snake) {
     bugFood = spawnBugFood();
-    gameInterval = setInterval(gameStep, 120);
+    gameInterval = setInterval(gameStep, 220);
   }
+}
+
+function relaunchGame() {
+  document.getElementById('crash-overlay').classList.add('hidden');
+  startGame();
+}
+
+function simulateCrash() {
+  clearInterval(gameInterval);
+  gameInterval = null;
+
+  const crashes = [
+    { type: 'Access Violation', summary: 'Access violation — read from null pointer at 0x00000000', stack: ['AccessViolation: 0x00000000\n  at MemoryManager.read() :88\n  at GameEngine.update() :204\n  at MainLoop.tick() :12'] },
+    { type: 'Stack Overflow',   summary: 'Stack overflow in recursive collision resolver',           stack: ['StackOverflowError: max depth 512 exceeded\n  at CollisionResolver.resolve() :33\n  at CollisionResolver.resolve() :33\n  at GameEngine.update() :204'] },
+    { type: 'Out of Memory',    summary: 'Out of memory — heap exhausted during asset streaming',    stack: ['OutOfMemoryError: heap limit exceeded\n  at AssetStreamer.load() :61\n  at SceneManager.transition() :17\n  at GameEngine.update() :204'] },
+  ];
+  const c = crashes[Math.floor(Math.random() * crashes.length)];
+
+  defectSeq++;
+  defectCount++;
+  updateUI();
+
+  const defect = {
+    id: `CRASH-${String(defectSeq).padStart(4,'0')}`,
+    type: c.type,
+    severity: 'Critical',
+    component: 'GameEngine',
+    summary: c.summary,
+    session: sessionId,
+    score,
+    stack: c.stack,
+    isCrash: true,
+  };
+
+  document.getElementById('crash-msg').textContent = c.stack[0];
+  document.getElementById('crash-overlay').classList.remove('hidden');
+
+  sendToBloom({ ...defect, summary: `[CRASH] ${c.summary}` });
+}
+
+function simulateDefect() {
+  if (activeDefect) return;
+  clearInterval(gameInterval);
+  gameInterval = null;
+  triggerDefect(snake ? snake[0] : { x: 10, y: 10 });
 }
 
 function gameOver(reason) {
@@ -537,19 +599,23 @@ function draw() {
 
 // ── Input ─────────────────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
+  // Global shortcuts — work any time game is running
+  if (e.key === 'S' && snake && !activeDefect) { simulateCrash();  e.preventDefault(); return; }
+  if (e.key === 'F' && snake && !activeDefect) { simulateDefect(); e.preventDefault(); return; }
+
   if (activeDefect) {
     if (e.key === 'Escape') dismissDefect();
     return;
   }
+
   const map = {
     ArrowUp:    {x:0,y:-1}, w: {x:0,y:-1}, W: {x:0,y:-1},
-    ArrowDown:  {x:0,y:1},  s: {x:0,y:1},  S: {x:0,y:1},
+    ArrowDown:  {x:0,y:1},
     ArrowLeft:  {x:-1,y:0}, a: {x:-1,y:0}, A: {x:-1,y:0},
     ArrowRight: {x:1,y:0},  d: {x:1,y:0},  D: {x:1,y:0},
   };
   const nd = map[e.key];
   if (nd) {
-    // Prevent 180-degree reversal
     if (nd.x !== -dir.x || nd.y !== -dir.y) nextDir = nd;
     e.preventDefault();
   }

@@ -5,9 +5,7 @@ let gameWindow = null;
 
 function createGameWindow() {
   gameWindow = new BrowserWindow({
-    width: 800,
-    height: 680,
-    resizable: false,
+    fullscreen: true,
     title: 'Bloom Snake — Bloomberg QC Demo',
     icon: path.join(__dirname, '..', 'assets', 'game.png'),
     backgroundColor: '#070a12',
